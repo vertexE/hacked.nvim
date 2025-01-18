@@ -84,6 +84,7 @@ local show_virtual_text_diagnostics = function()
     })
 end
 
+-- TODO: add opts for which diagnostics to show + symbols, spacing, etc
 M.setup = function()
     vim.api.nvim_create_autocmd({ "DiagnosticChanged", "CursorMoved" }, {
         pattern = {
