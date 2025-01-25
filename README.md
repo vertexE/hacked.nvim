@@ -28,13 +28,20 @@ A collection of smaller plugins / modifications I use for neovim.
 - Open a blame window / virtual text for current line / selection.
 - Also can browse the commit if you have `gh` installed.
 
+<img width="1505" alt="Screenshot 2025-01-25 at 5 06 39 PM" src="https://github.com/user-attachments/assets/c5b16c2c-c8d7-4072-83a5-9d10dfeac8e2" />
+
 #### diagnostics
 
 - underline diagnostics for errors only
 
+<img width="1336" alt="image" src="https://github.com/user-attachments/assets/fcbde96c-01d1-48b4-9b2e-46e81bd46505" />
+
+
 #### executor
 
 - execute code blocks in markdown files. Supports python, go, and javascript.
+
+https://github.com/user-attachments/assets/46ed91b1-58b3-4d06-b5aa-b89885cfdb1b
 
 ## Next Steps
 
