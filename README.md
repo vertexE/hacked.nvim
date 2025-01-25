@@ -34,8 +34,7 @@ A collection of smaller plugins / modifications I use for neovim.
 
 - underline diagnostics for errors only
 
-<img width="1336" alt="image" src="https://github.com/user-attachments/assets/fcbde96c-01d1-48b4-9b2e-46e81bd46505" />
-
+<img width="1512" alt="image" src="https://github.com/user-attachments/assets/00047c51-1abe-41ae-b12b-0ea73c8a0dff" />
 
 #### executor
 
