@@ -21,7 +21,7 @@ A collection of smaller plugins / modifications I use for neovim.
     },
 ```
 
-### Available
+### Available Plugins
 
 #### blame
 
