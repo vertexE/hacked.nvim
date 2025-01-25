@@ -14,7 +14,6 @@ local severity_to_string = function(severity)
 end
 
 local MAX_DIAGNOSTIC_MSG_LENGTH = 80
-local SPACES = 4
 
 --- @param diagnostic vim.Diagnostic
 --- @param spaces integer number of spaces to prefix
@@ -72,7 +71,7 @@ local show_virtual_text_diagnostics = function()
     end
     local virt_lines = {}
     for _, diagnostic in ipairs(diagnostics) do
-        local lines = format_diagnostic(diagnostic, SPACES + diagnostic.col)
+        local lines = format_diagnostic(diagnostic, diagnostic.col)
         for _, line in ipairs(lines) do
             table.insert(virt_lines, line)
         end
