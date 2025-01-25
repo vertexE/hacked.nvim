@@ -38,7 +38,7 @@ A collection of smaller plugins / modifications I use for neovim.
 
 #### executor
 
-- execute code blocks in markdown files. Supports python, go, and javascript.
+- execute code blocks in markdown files by hitting `<enter>`. Supports python, go, and javascript.
 
 https://github.com/user-attachments/assets/46ed91b1-58b3-4d06-b5aa-b89885cfdb1b
 
