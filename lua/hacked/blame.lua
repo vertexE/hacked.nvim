@@ -1,8 +1,8 @@
 local M = {}
 
-local tbl = require("hacked.tbl")
-local buffer = require("hacked.buffer")
-local str = require("hacked.str")
+local tbl = require("hacked._private.tbl")
+local buffer = require("hacked._private.buffer")
+local str = require("hacked._private.str")
 
 --- @class hacked.blame.Config
 
