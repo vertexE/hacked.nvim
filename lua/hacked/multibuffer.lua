@@ -2,13 +2,15 @@ local M = {}
 
 local PREVIEW_SIZE = 9
 
+--- BUG: scroll height affects placement of windows...
+
 --- @class hacked.multibuffer.Entry
 --- @field bufnr integer
 --- @field lnum integer
 --- @field msg string
 --- @field fp string filepath
 
---- @alias hacked.multibuffer.Type "diagnostics"
+--- @alias hacked.multibuffer.Type "diagnostics"|"quickfix"
 
 local OFFSET = 3
 
@@ -24,6 +26,17 @@ local preview = function(bufnr, position)
     end
     table.insert(lines, #lines + 1, "```")
     return lines
+end
+
+--- @param message string
+--- @param file string
+--- @param type hacked.multibuffer.Type
+local header = function(message, file, type)
+    if type == "diagnostics" then
+        return { { "  " .. message, "MiniStatuslineModeReplace" }, { "  " .. file, "Comment" } }
+    else
+        return { { "  " .. message, "MiniStatuslineModeNormal" }, { "  " .. file, "Comment" } }
+    end
 end
 
 --- @class hacked.multibuffer.DrawOpts
@@ -45,24 +58,28 @@ M.draw = function(entries, type, opts)
     vim.api.nvim_buf_clear_namespace(bufnr, ns, 0, -1)
     local group = vim.api.nvim_create_augroup("hacked.multibuffer" .. type, { clear = true })
     for i, entry in ipairs(entries) do
-        -- TODO: multibuffer.lua will handle setting up this autocmd
-        -- outside of draw.
-        vim.api.nvim_create_autocmd({ "BufWritePost" }, {
-            buffer = entry.bufnr,
-            group = group,
-            callback = function(ev)
-                if ev.buf == entry.bufnr and vim.api.nvim_buf_is_valid(bufnr) and vim.api.nvim_win_is_valid(winr) then
-                    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, {})
-                    M.draw(M.diagnostic_entries(), type, { bufnr = bufnr, winr = winr })
-                end
-            end,
-        })
+        if type == "diagnostics" then
+            vim.api.nvim_create_autocmd({ "BufWritePost" }, {
+                buffer = entry.bufnr,
+                group = group,
+                callback = function(ev)
+                    if
+                        ev.buf == entry.bufnr
+                        and vim.api.nvim_buf_is_valid(bufnr)
+                        and vim.api.nvim_win_is_valid(winr)
+                    then
+                        vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, {})
+                        M.draw(M.diagnostic_entries(), type, { bufnr = bufnr, winr = winr })
+                    end
+                end,
+            })
+        end
 
         local offset = (i - 1) * PREVIEW_SIZE
         local content = preview(entry.bufnr, entry.lnum)
         vim.api.nvim_buf_set_lines(bufnr, offset, offset + 1, false, content)
         vim.api.nvim_buf_set_extmark(bufnr, ns, offset, 0, {
-            virt_text = { { "  " .. entry.msg, "MiniStatuslineModeReplace" }, { "  " .. entry.fp, "Comment" } },
+            virt_text = header(entry.msg, entry.fp, type),
             virt_lines_above = true,
             virt_lines = i > 1 and { { { string.rep("─", 1000), "Comment" } } } or nil,
             virt_text_pos = "overlay",
@@ -74,10 +91,11 @@ M.draw = function(entries, type, opts)
         local editing = math.ceil(cursor / PREVIEW_SIZE)
         if entries[editing] then
             local entry = entries[editing]
+            local top_win_ln = vim.fn.getpos("w0")[2]
             local _winr = vim.api.nvim_open_win(entry.bufnr, true, {
                 border = "none",
                 relative = "win",
-                row = editing == 1 and 1 or ((editing - 1) * PREVIEW_SIZE) + editing,
+                row = ((editing - 1) * PREVIEW_SIZE) - top_win_ln + editing + 1,
                 col = 0,
                 height = 7,
                 width = vim.api.nvim_win_get_width(0),
@@ -100,7 +118,29 @@ local open = function(entries, type)
     M.draw(entries, type)
 end
 
--- TODO: should have a bunch of sub modules that can transform <x> into canonical model
+--- @return table<hacked.multibuffer.Entry>
+M.quickfix_entries = function()
+    local quickfix_list = vim.fn.getqflist()
+    local entries = {}
+    for _, item in ipairs(quickfix_list) do
+        if item.bufnr then
+            local name = vim.api.nvim_buf_get_name(item.bufnr)
+            local path = vim.fn.fnamemodify(name, ":~:.")
+            table.insert(entries, {
+                bufnr = item.bufnr,
+                lnum = item.lnum - 1, -- lnum is 1-based, convert to 0-based
+                msg = item.text,
+                fp = path,
+            })
+        end
+    end
+
+    return entries
+end
+
+M.quickfix = function()
+    open(M.quickfix_entries(), "quickfix")
+end
 
 --- @return table<hacked.multibuffer.Entry>
 M.diagnostic_entries = function()
@@ -118,7 +158,6 @@ M.diagnostic_entries = function()
             })
         end
     end
-    vim.print(entries)
     return entries
 end
 
