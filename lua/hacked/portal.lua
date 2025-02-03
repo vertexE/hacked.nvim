@@ -21,6 +21,7 @@ local state = {
 
 local CACHE = "~/.cache/nvim/hacked-portal"
 local PERSIST_FILE_NAME = "_hacked-portal.json"
+local MAX_BLOCKS = 5
 
 local load = function()
     local dir = vim.fn.expand(CACHE)
@@ -42,8 +43,26 @@ local persist = function()
     end)
 end
 
+--- @param path string
+--- @return table<table<string>>
+local header = function(path)
+    local t = {}
+    for i = 1, #state.blocks do
+        table.insert(t, { "", i == state.pos and "HackedPortalEdge" or "HackedPortalEdgeNC" })
+        table.insert(t, { string.format("%d", i), i == state.pos and "HackedPortal" or "HackedPortalNC" })
+        table.insert(t, { "", i == state.pos and "HackedPortalEdge" or "HackedPortalEdgeNC" })
+    end
+    table.insert(t, { string.rep(" ", 5) .. path, "Comment" })
+    return t
+end
+
 --- save selection to code blocks
 M.save = function()
+    if #state.blocks == MAX_BLOCKS then
+        vim.notify("cannot save - max saved code blocks", vim.log.levels.WARN, {})
+        return
+    end
+
     local bufnr = vim.api.nvim_get_current_buf()
     local sel_start, sel_end = buffer.active_selection()
     local lines = vim.api.nvim_buf_get_lines(bufnr, sel_start - 1, sel_end, false)
@@ -79,14 +98,11 @@ local draw = function(bufnr)
     table.insert(lines, #lines + 1, "```")
     vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
     vim.api.nvim_buf_set_extmark(bufnr, ns, 0, 0, {
-        virt_text = {
-            { "", "@comment.todo" },
-            { "portal", "MiniStatuslineModeNormal" },
-            { "", "@comment.todo" },
-            { string.rep(" ", 5) .. block.path, "Comment" },
-        },
+        virt_text = { unpack(header(block.path)) },
         virt_text_pos = "overlay",
     })
+
+    vim.api.nvim_command("normal! 3gg")
 end
 
 M.open = function()
@@ -103,13 +119,13 @@ M.open = function()
     local win_width = vim.api.nvim_win_get_width(winr)
     local win_height = vim.api.nvim_win_get_height(winr)
     local width = math.ceil(win_width * 0.5)
-    local height = math.ceil(win_height * 0.2)
+    local height = math.ceil(win_height * 0.3)
 
     local float_buf = vim.api.nvim_create_buf(false, true)
-    portal_winr = vim.api.nvim_open_win(float_buf, false, {
-        relative = "cursor",
+    portal_winr = vim.api.nvim_open_win(float_buf, true, {
+        relative = "editor",
         row = 1,
-        col = 0,
+        col = 1000,
         width = width,
         height = height,
         style = "minimal",
@@ -151,7 +167,7 @@ end
 
 --- loadup persisted code blocks
 M.setup = function()
-    load()
+    vim.schedule(load)
     local dir = vim.fn.expand(CACHE)
     if vim.fn.isdirectory(dir) == 0 then
         vim.fn.mkdir(dir, "p")
