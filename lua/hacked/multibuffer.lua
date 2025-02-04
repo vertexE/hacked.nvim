@@ -4,6 +4,13 @@ local PREVIEW_SIZE = 9
 
 --- BUG: scroll height affects placement of windows...
 
+-- vim.lsp.buf.references(nil, {on_list = function(opts) vim.print(opts) end})
+-- TODO: perfect enhancement I can make to my multibuffer
+-- but I actually need to make it better
+-- probably a centered float that displays one at a time
+-- but I can tab through it?
+-- easier to handle refreshing if I did it that way too!
+
 --- @class hacked.multibuffer.Entry
 --- @field bufnr integer
 --- @field lnum integer
