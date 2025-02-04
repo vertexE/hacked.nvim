@@ -1,9 +1,10 @@
 # hacked.nvim
 
 A collection of smaller plugins / modifications I use for neovim.
+Feel free to use any of them!
 
 > [!caution]
-> plugin still in a "draft" state.
+> plugin still in a "draft" state and is designed for my needs.
 
 ## Install
 
