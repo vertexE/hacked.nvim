@@ -138,7 +138,7 @@ M.open = function()
         state.pos = (state.pos % #state.blocks) + 1
         draw(float_buf)
     end, { desc = "hacked.portal: next saved code block", buffer = float_buf })
-    vim.keymap.set("n", "<tab>", function()
+    vim.keymap.set("n", "<s-tab>", function()
         if state.pos == 1 then
             state.pos = #state.blocks
         else
