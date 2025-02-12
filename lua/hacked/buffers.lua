@@ -1,4 +1,5 @@
 local M = {}
+local Render = {}
 
 --- @class hacked.buffers.Buffer
 --- @field bufnr integer
@@ -29,61 +30,108 @@ local list_buffers = function()
     return buffers
 end
 
-M.open = function()
-    local winr = vim.api.nvim_get_current_win()
-    local bufnr = vim.api.nvim_get_current_buf()
-    local win_width = vim.api.nvim_win_get_width(winr)
-    local win_height = vim.api.nvim_win_get_height(winr)
-    local width = math.ceil(win_width * 0.4)
-    local height = math.ceil(win_height * 0.2)
+--- @param float_bufnr integer
+--- @param active_bufnr integer
+--- @param winr integer
+Render.draw = function(float_bufnr, active_bufnr, winr)
+    local ns = vim.api.nvim_create_namespace("hacked.buffers")
+    -- clear the buffer
+    vim.api.nvim_buf_set_lines(float_bufnr, 0, -1, false, {})
+    vim.api.nvim_buf_clear_namespace(float_bufnr, ns, 0, -1)
 
     local buffers = list_buffers()
-    local float_buf = vim.api.nvim_create_buf(false, true)
-    vim.api.nvim_open_win(float_buf, true, {
-        title = "buffers",
-        relative = "editor",
-        row = 0,
-        col = 0,
-        width = width,
-        height = height,
-        style = "minimal",
-        border = "single",
-    })
     vim.keymap.set("n", "<enter>", function()
         local cursor = vim.fn.getpos(".")[2]
         local _bufnr = buffers[cursor].bufnr
         vim.api.nvim_set_current_win(winr)
         vim.api.nvim_set_current_buf(_bufnr)
-        if vim.api.nvim_buf_is_loaded(float_buf) then
-            vim.api.nvim_buf_delete(float_buf, { force = true })
+        Render.draw(float_bufnr, _bufnr, winr)
+    end, { buffer = float_bufnr })
+    vim.keymap.set("n", "dd", function()
+        local cursor = vim.fn.getpos(".")[2]
+        local _bufnr = buffers[cursor].bufnr
+        if vim.api.nvim_buf_is_loaded(_bufnr) then
+            vim.api.nvim_buf_delete(_bufnr, { force = true })
         end
-    end, { buffer = float_buf })
+        Render.draw(float_bufnr, active_bufnr, winr)
+    end, { buffer = float_bufnr })
 
     vim.keymap.set("n", "q", function()
-        if vim.api.nvim_buf_is_loaded(float_buf) then
-            vim.api.nvim_buf_delete(float_buf, { force = true })
+        if vim.api.nvim_buf_is_loaded(float_bufnr) then
+            vim.api.nvim_buf_delete(float_bufnr, { force = true })
         end
-    end, { buffer = float_buf })
+    end, { buffer = float_bufnr })
 
-    local ns = vim.api.nvim_create_namespace("hacked.buffers")
-    vim.api.nvim_buf_clear_namespace(float_buf, ns, 0, -1)
+    local offset = vim.iter(buffers)
+        :map(function(_buffer)
+            return #tostring(_buffer.bufnr)
+        end)
+        :fold({}, function(acc, v)
+            acc.max = math.max(v, acc.max or v)
+            return acc
+        end).max
+
     for i, _buffer in ipairs(buffers) do
-        local active = _buffer.bufnr == bufnr
-        local symbol = active and "  " or "  "
-        vim.api.nvim_buf_set_lines(float_buf, i - 1, i, false, {
-            " " .. symbol .. tostring(_buffer.bufnr) .. " " .. _buffer.name .. " " .. _buffer.path,
+        local active = _buffer.bufnr == active_bufnr
+        local modified = vim.bo[_buffer.bufnr].modified and " " or ""
+        local bufnr_s = tostring(_buffer.bufnr)
+        local symbol = active and "  " or "  "
+        vim.api.nvim_buf_set_lines(float_bufnr, i - 1, i, false, {
+            " "
+                .. symbol
+                .. string.rep(" ", (offset - #bufnr_s) or 0)
+                .. bufnr_s
+                .. " "
+                .. _buffer.name
+                .. " "
+                .. modified
         })
-        vim.api.nvim_buf_set_extmark(float_buf, ns, i - 1, 1, {
+        vim.api.nvim_buf_set_extmark(float_bufnr, ns, i - 1, 1, {
             virt_text = {
-                { symbol .. tostring(_buffer.bufnr), active and "Boolean" or "Comment" },
+                {
+                    symbol .. string.rep(" ", (offset - #bufnr_s) or 0) .. bufnr_s,
+                    active and "Boolean" or "Comment",
+                },
                 { " " .. _buffer.name, "String" },
-                { " " .. _buffer.path, "Comment" },
+                { " " .. modified, "DiagnosticOk" },
             },
             virt_text_pos = "overlay",
         })
     end
+end
 
-    vim.bo[float_buf].modifiable = false
+local float_bufnr = -1
+local float_winr = -1
+
+M.open = function()
+    if vim.api.nvim_win_is_valid(float_winr) and vim.api.nvim_buf_is_valid(float_bufnr) then
+        vim.api.nvim_win_close(float_winr, true)
+        vim.api.nvim_buf_delete(float_bufnr, { force = true })
+        return
+    end
+
+    local winr = vim.api.nvim_get_current_win()
+    local bufnr = vim.api.nvim_get_current_buf()
+    local win_width = vim.api.nvim_win_get_width(winr)
+    local width = math.ceil(win_width * 0.2)
+
+    float_bufnr = vim.api.nvim_create_buf(false, true)
+    float_winr = vim.api.nvim_open_win(float_bufnr, true, {
+        win = winr,
+        width = width,
+        split = "left",
+        style = "minimal",
+    })
+
+    Render.draw(float_bufnr, bufnr, winr)
+    vim.api.nvim_create_autocmd({ "BufEnter", "BufModifiedSet" }, {
+        group = vim.api.nvim_create_augroup("hacked.buffers", { clear = true }),
+        callback = function(ev)
+            if vim.api.nvim_win_is_valid(float_winr) and vim.api.nvim_buf_is_valid(float_bufnr) then
+                Render.draw(float_bufnr, ev.buf, winr)
+            end
+        end,
+    })
 end
 
 M.setup = function()
