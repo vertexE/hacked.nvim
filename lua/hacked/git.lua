@@ -1,6 +1,8 @@
 local M = {}
 local H = {}
 
+local confirm = require("hacked.confirm")
+
 --- @alias hacked.git.ChangeType "modified"|"renamed"|"added"|"deleted"|"conflict"
 --- @alias hacked.git.Stage "staged"|"untracked"|"working"|"partial"
 
@@ -96,7 +98,8 @@ local parse_git_status = function(s)
         local change = {
             file = file,
             path = fp,
-            stage = (unstaged and staged and "partial") or (staged and "staged" or "working"),
+            stage = status == "?" and "untracked"
+                or ((unstaged and staged and "partial") or (staged and "staged" or "working")),
             type = status == "M" and "modified"
                 or status == "A" and "added"
                 or status == "?" and "added"
@@ -128,14 +131,14 @@ end
 --- @param change hacked.git.Change
 local draw_file = function(bufnr, ns, line, change)
     vim.api.nvim_buf_set_lines(bufnr, -1, -1, false, { " " })
-    vim.print(change)
     local hl = change.type == "conflict" and "MiniIconsRed"
         or (
             change.stage == "partial" and "MiniIconsYellow"
             or (change.stage == "staged" and "MiniIconsGreen" or "MiniIconsGrey")
         )
+    local symbol = change.stage == "staged" and " " or " "
     vim.api.nvim_buf_set_extmark(bufnr, ns, line, 0, {
-        virt_text = { { string.rep(" ", change.depth), "Comment" }, { change.file, hl } },
+        virt_text = { { string.rep(" ", change.depth), "Comment" }, { symbol .. change.file, hl } },
         virt_text_pos = "eol",
     })
 end
@@ -145,7 +148,7 @@ end
 local draw_tree = function(bufnr, tree)
     local ns = vim.api.nvim_create_namespace("hacked.git.status")
     vim.api.nvim_buf_clear_namespace(bufnr, ns, 0, -1)
-    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, {})
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { " " })
     state.lines_to_path = {}
 
     local stack = vim.iter(tree.children)
@@ -180,6 +183,21 @@ local draw_tree = function(bufnr, tree)
         line = line + 1
         state.lines_to_path[line] = change
     end
+end
+
+--- @param change hacked.git.Change dir rel path to file to add
+H.git_restore = function(bufnr, winr, change)
+    vim.system(
+        { "git", "restore", change.path },
+        { text = true },
+        vim.schedule_wrap(function(out)
+            if #out.stderr > 0 then
+                vim.notify("failed to restore file", vim.log.levels.ERROR, {})
+            else
+                H.git_status(bufnr, winr)
+            end
+        end)
+    )
 end
 
 --- @param change hacked.git.Change dir rel path to file to add
@@ -218,7 +236,34 @@ H.git_status = function(bufnr, winr)
 
                 draw_tree(bufnr, tree)
 
-                vim.keymap.set("n", "<space>", function()
+                -- TODO: need to think more about how I want this to work...
+                -- vim.keymap.set("n", "dd", function()
+                --     local clnr = vim.fn.getpos(".")[2]
+                --     local change = state.lines_to_path[clnr]
+                --     if change then
+                --         if change.stage == "untracked" then
+                --             vim.notify("cannot restore untracked file", vim.log.levels.WARN, {})
+                --             return
+                --         end
+                --
+                --         confirm.open({
+                --             prompt = "Are you sure you want to restore " .. change.path .. "?",
+                --             type = "accept",
+                --             callback = function(accepted)
+                --                 if accepted then
+                --                     H.git_restore(bufnr, winr, change)
+                --                     vim.notify("restoring " .. change.path, vim.log.levels.INFO, {})
+                --                 else
+                --                     vim.notify("skipping restore", vim.log.levels.INFO, {})
+                --                 end
+                --             end,
+                --         })
+                --     else
+                --         vim.notify("not a file", vim.log.levels.ERROR, {})
+                --     end
+                -- end, { buffer = bufnr })
+
+                vim.keymap.set("n", "<space><space>", function()
                     local clnr = vim.fn.getpos(".")[2]
                     local change = state.lines_to_path[clnr]
                     if change then
@@ -226,7 +271,7 @@ H.git_status = function(bufnr, winr)
                     else
                         vim.notify("not a file", vim.log.levels.ERROR, {})
                     end
-                end)
+                end, { buffer = bufnr })
 
                 vim.keymap.set("n", "<enter>", function()
                     local clnr = vim.fn.getpos(".")[2]
@@ -239,13 +284,13 @@ H.git_status = function(bufnr, winr)
                     else
                         vim.notify("not a file", vim.log.levels.ERROR, {})
                     end
-                end)
+                end, { buffer = bufnr })
 
                 vim.keymap.set("n", "q", function()
                     if vim.api.nvim_win_is_valid(winr) then
                         vim.api.nvim_win_close(winr, true)
                     end
-                end)
+                end, { buffer = bufnr })
             end
         end)
     )
