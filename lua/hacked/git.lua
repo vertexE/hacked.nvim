@@ -145,7 +145,8 @@ end
 
 --- @param bufnr integer
 --- @param tree hacked.git.Dir
-local draw_tree = function(bufnr, tree)
+--- @param buf_name string current buffer name
+local draw_tree = function(bufnr, tree, buf_name)
     local ns = vim.api.nvim_create_namespace("hacked.git.status")
     vim.api.nvim_buf_clear_namespace(bufnr, ns, 0, -1)
     vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { " " })
@@ -168,6 +169,10 @@ local draw_tree = function(bufnr, tree)
             draw_file(bufnr, ns, line, change)
             line = line + 1
             state.lines_to_path[line] = change
+
+            if change.path == buf_name then
+                vim.api.nvim_win_set_cursor(0, { line, 0 })
+            end
         end
 
         -- insert children to top of stack (last one inserted is the first to be written next loop)
@@ -182,6 +187,10 @@ local draw_tree = function(bufnr, tree)
         draw_file(bufnr, ns, line, change)
         line = line + 1
         state.lines_to_path[line] = change
+
+        if change.path == buf_name then
+            vim.api.nvim_win_set_cursor(0, { line, 0 })
+        end
     end
 end
 
@@ -194,7 +203,7 @@ H.git_restore = function(bufnr, winr, change)
             if #out.stderr > 0 then
                 vim.notify("failed to restore file", vim.log.levels.ERROR, {})
             else
-                H.git_status(bufnr, winr)
+                H.git_status(bufnr, winr, "")
             end
         end)
     )
@@ -225,7 +234,8 @@ end
 
 --- @param bufnr integer
 --- @param winr integer
-H.git_status = function(bufnr, winr)
+--- @param buf_name string
+H.git_status = function(bufnr, winr, buf_name)
     vim.system(
         { "git", "status", "--short" },
         { text = true },
@@ -234,7 +244,7 @@ H.git_status = function(bufnr, winr)
                 local changes = parse_git_status(res.stdout)
                 local tree = tree_rep(changes)
 
-                draw_tree(bufnr, tree)
+                draw_tree(bufnr, tree, buf_name)
 
                 -- TODO: need to think more about how I want this to work...
                 -- vim.keymap.set("n", "dd", function()
@@ -298,6 +308,7 @@ end
 
 M.status = function()
     local winr = vim.api.nvim_get_current_win()
+    local relative = vim.fn.fnamemodify(vim.api.nvim_buf_get_name(0), ":~:.")
     local editor_width = vim.o.columns
     local width = math.ceil(editor_width * 0.25)
 
@@ -308,7 +319,7 @@ M.status = function()
         split = "left",
         style = "minimal",
     })
-    H.git_status(float_buf, l_winr)
+    H.git_status(float_buf, l_winr, relative)
 end
 
 return M
