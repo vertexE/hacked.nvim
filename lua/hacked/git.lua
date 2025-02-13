@@ -286,6 +286,11 @@ H.git_status = function(bufnr, winr, buf_name)
                 vim.keymap.set("n", "<enter>", function()
                     local clnr = vim.fn.getpos(".")[2]
                     local change = state.lines_to_path[clnr]
+                    if change.type == "deleted" then
+                        vim.notify("cannot open deleted file", vim.log.levels.WARN, {})
+                        return
+                    end
+
                     if change then
                         if vim.api.nvim_win_is_valid(winr) then
                             vim.api.nvim_win_close(winr, true)
