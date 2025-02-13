@@ -252,24 +252,18 @@ H.git_status = function(bufnr, winr)
 end
 
 M.status = function()
+    local winr = vim.api.nvim_get_current_win()
     local editor_width = vim.o.columns
-    local editor_height = vim.o.lines
-    local width = math.ceil(editor_width * 0.5)
-    local height = math.ceil(editor_height * 0.8)
-    local row = (editor_height - height) / 2
-    local col = (editor_width - width) / 2
+    local width = math.ceil(editor_width * 0.25)
 
     local float_buf = vim.api.nvim_create_buf(false, true)
-    local winr = vim.api.nvim_open_win(float_buf, true, {
-        relative = "editor",
-        row = row,
-        col = col,
+    local l_winr = vim.api.nvim_open_win(float_buf, true, {
+        win = winr,
         width = width,
-        height = height,
+        split = "left",
         style = "minimal",
-        border = "rounded",
     })
-    H.git_status(float_buf, winr)
+    H.git_status(float_buf, l_winr)
 end
 
 return M
