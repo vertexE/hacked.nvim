@@ -152,6 +152,14 @@ local draw_tree = function(bufnr, tree, buf_name)
     vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { " " })
     state.lines_to_path = {}
 
+    if #tree.children == 0 and #tree.files == 0 then
+        vim.api.nvim_buf_set_extmark(bufnr, ns, 0, 0, {
+            virt_text = { { "(clean working tree)", "Comment" } },
+            virt_text_pos = "eol",
+        })
+        return
+    end
+
     local stack = vim.iter(tree.children)
         :map(function(v)
             return vim.tbl_extend("keep", v, { depth = 0 })
