@@ -100,7 +100,7 @@ local parse_git_status = function(s)
             path = fp,
             stage = status == "?" and "untracked"
                 or ((unstaged and staged and "partial") or (staged and "staged" or "working")),
-            type = status == "M" and "modified"
+            type = (status == "M" or status == "m") and "modified"
                 or status == "A" and "added"
                 or status == "?" and "added"
                 or status == "D" and "deleted"
@@ -131,12 +131,12 @@ end
 --- @param change hacked.git.Change
 local draw_file = function(bufnr, ns, line, change)
     vim.api.nvim_buf_set_lines(bufnr, -1, -1, false, { " " })
-    local hl = change.type == "conflict" and "MiniIconsRed"
+    local hl = (change.type == "conflict" or change.type == "deleted") and "MiniIconsRed"
         or (
             change.stage == "partial" and "MiniIconsYellow"
             or (change.stage == "staged" and "MiniIconsGreen" or "MiniIconsGrey")
         )
-    local symbol = change.stage == "staged" and " " or " "
+    local symbol = change.type == "conflict" and " " or (change.stage == "staged" and " " or " ")
     vim.api.nvim_buf_set_extmark(bufnr, ns, line, 0, {
         virt_text = { { string.rep(" ", change.depth), "Comment" }, { symbol .. change.file, hl } },
         virt_text_pos = "eol",
