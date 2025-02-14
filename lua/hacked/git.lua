@@ -202,14 +202,15 @@ local draw_tree = function(bufnr, tree, buf_name)
     end
 end
 
+--- resets the change to HEAD
 --- @param change hacked.git.Change dir rel path to file to add
-H.git_restore = function(bufnr, winr, change)
+H.git_file_reset = function(bufnr, winr, change)
     vim.system(
-        { "git", "restore", change.path },
+        { "git", "checkout", "HEAD", "--", change.path },
         { text = true },
         vim.schedule_wrap(function(out)
             if #out.stderr > 0 then
-                vim.notify("failed to restore file", vim.log.levels.ERROR, {})
+                vim.notify("failed to checkout file", vim.log.levels.ERROR, {})
             else
                 H.git_status(bufnr, winr, "")
             end
@@ -254,32 +255,31 @@ H.git_status = function(bufnr, winr, buf_name)
 
                 draw_tree(bufnr, tree, buf_name)
 
-                -- TODO: need to think more about how I want this to work...
-                -- vim.keymap.set("n", "dd", function()
-                --     local clnr = vim.fn.getpos(".")[2]
-                --     local change = state.lines_to_path[clnr]
-                --     if change then
-                --         if change.stage == "untracked" then
-                --             vim.notify("cannot restore untracked file", vim.log.levels.WARN, {})
-                --             return
-                --         end
-                --
-                --         confirm.open({
-                --             prompt = "Are you sure you want to restore " .. change.path .. "?",
-                --             type = "accept",
-                --             callback = function(accepted)
-                --                 if accepted then
-                --                     H.git_restore(bufnr, winr, change)
-                --                     vim.notify("restoring " .. change.path, vim.log.levels.INFO, {})
-                --                 else
-                --                     vim.notify("skipping restore", vim.log.levels.INFO, {})
-                --                 end
-                --             end,
-                --         })
-                --     else
-                --         vim.notify("not a file", vim.log.levels.ERROR, {})
-                --     end
-                -- end, { buffer = bufnr })
+                vim.keymap.set("n", "dd", function()
+                    local clnr = vim.fn.getpos(".")[2]
+                    local change = state.lines_to_path[clnr]
+                    if change then
+                        if change.stage == "untracked" then
+                            vim.notify("cannot restore untracked file", vim.log.levels.WARN, {})
+                            return
+                        end
+
+                        confirm.open({
+                            prompt = "Are you sure you want to restore " .. change.path .. "?",
+                            type = "accept",
+                            callback = function(accepted)
+                                if accepted then
+                                    H.git_file_reset(bufnr, winr, change)
+                                    vim.notify("restoring " .. change.path, vim.log.levels.INFO, {})
+                                else
+                                    vim.notify("skipping restore", vim.log.levels.INFO, {})
+                                end
+                            end,
+                        })
+                    else
+                        vim.notify("not a file", vim.log.levels.ERROR, {})
+                    end
+                end, { buffer = bufnr })
 
                 vim.keymap.set("n", "<space><space>", function()
                     local clnr = vim.fn.getpos(".")[2]
