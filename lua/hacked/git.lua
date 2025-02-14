@@ -204,7 +204,7 @@ end
 
 --- resets the change to HEAD
 --- @param change hacked.git.Change dir rel path to file to add
-H.git_file_reset = function(bufnr, winr, change)
+H.git_file_reset = function(bufnr, pwinr, winr, change)
     vim.system(
         { "git", "checkout", "HEAD", "--", change.path },
         { text = true },
@@ -212,7 +212,7 @@ H.git_file_reset = function(bufnr, winr, change)
             if #out.stderr > 0 then
                 vim.notify("failed to checkout file", vim.log.levels.ERROR, {})
             else
-                H.git_status(bufnr, winr, "")
+                H.git_status(bufnr, pwinr, winr, "")
             end
         end)
     )
@@ -242,9 +242,10 @@ H.git_toggle = function(bufnr, line, change)
 end
 
 --- @param bufnr integer
+--- @param pwinr integer
 --- @param winr integer
 --- @param buf_name string
-H.git_status = function(bufnr, winr, buf_name)
+H.git_status = function(bufnr, pwinr, winr, buf_name)
     vim.system(
         { "git", "status", "--short" },
         { text = true },
@@ -269,7 +270,7 @@ H.git_status = function(bufnr, winr, buf_name)
                             type = "accept",
                             callback = function(accepted)
                                 if accepted then
-                                    H.git_file_reset(bufnr, winr, change)
+                                    H.git_file_reset(bufnr, pwinr, winr, change)
                                     vim.notify("restoring " .. change.path, vim.log.levels.INFO, {})
                                 else
                                     vim.notify("skipping restore", vim.log.levels.INFO, {})
@@ -286,6 +287,17 @@ H.git_status = function(bufnr, winr, buf_name)
                     local change = state.lines_to_path[clnr]
                     if change then
                         H.git_toggle(bufnr, clnr, change)
+                    else
+                        vim.notify("not a file", vim.log.levels.ERROR, {})
+                    end
+                end, { buffer = bufnr })
+
+                vim.keymap.set("n", "o", function()
+                    local clnr = vim.fn.getpos(".")[2]
+                    local change = state.lines_to_path[clnr]
+                    if change then
+                        vim.api.nvim_set_current_win(pwinr)
+                        vim.cmd("edit " .. change.path)
                     else
                         vim.notify("not a file", vim.log.levels.ERROR, {})
                     end
@@ -332,7 +344,7 @@ M.status = function()
         split = "left",
         style = "minimal",
     })
-    H.git_status(float_buf, l_winr, relative)
+    H.git_status(float_buf, winr, l_winr, relative)
 end
 
 return M
