@@ -130,25 +130,6 @@ local parse_blame_lines = function(blame)
     return blames
 end
 
----@param bufnr integer
----@param sel_start integer
----@param sel_end integer
---- @return table<integer>
-local offsets = function(bufnr, sel_start, sel_end)
-    local lines = vim.api.nvim_buf_get_lines(bufnr, sel_start - 1, sel_end, false)
-    local max_line_length = tbl.max(vim.iter(lines)
-        :map(function(v)
-            return str.utf8_len(v)
-        end)
-        :totable())
-
-    return vim.iter(lines)
-        :map(function(v)
-            return max_line_length - str.utf8_len(v)
-        end)
-        :totable()
-end
-
 --- display git blame for a selction in a split window
 M.selection = function()
     if vim.api.nvim_win_is_valid(blame_win) then
@@ -180,28 +161,29 @@ M.selection = function()
 
     local ns = vim.api.nvim_create_namespace("hacked.blame.selection")
     vim.api.nvim_buf_clear_namespace(bufnr, ns, sel_start - 1, sel_end)
-    local whitespace = offsets(bufnr, sel_start, sel_end)
     local line = 1
     for _, blame_group in ipairs(blame_groups) do
         for i, blame in ipairs(blame_group) do
             if i == 1 then
                 vim.api.nvim_buf_set_extmark(bufnr, ns, sel_start - 2 + line, 0, {
+                    -- TODO: enhance this to have more colorful blame lines...?
+                    -- that way we know what belong with what
                     virt_text = {
-                        { string.rep(" ", whitespace[line]), "Comment" },
                         { " ", "TodoFgTODO" },
                         { blame.author .. " ", "TodoFgTODO" },
                         { blame.date .. " " .. blame.time .. " ", "Comment" },
                         { blame.commit, "TodoFgTODO" },
                     },
-                    virt_text_pos = "eol",
+                    virt_text_pos = "right_align",
+                    line_hl_group = "Comment" -- this would alternate to enable easier differentiation
                 })
             else
                 vim.api.nvim_buf_set_extmark(bufnr, ns, sel_start - 2 + line, 0, {
                     virt_text = {
-                        { string.rep(" ", whitespace[line]), "Comment" },
                         { "│", "TodoFgTODO" },
                     },
-                    virt_text_pos = "eol",
+                    virt_text_pos = "right_align",
+                    line_hl_group = "Comment"
                 })
             end
             line = line + 1
