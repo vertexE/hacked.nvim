@@ -1,5 +1,17 @@
 local M = {}
-local Render = {}
+local H = {}
+
+--- @class hacked.buffers.Options
+--- @field icons ?{active?: string, inactive?: string, modified?: string}
+
+--- @type hacked.buffers.Options
+local opts = {
+    icons = {
+        active = "󰡖 ",
+        inactive = " ",
+        modified = " ",
+    },
+}
 
 --- @class hacked.buffers.Buffer
 --- @field bufnr integer
@@ -33,7 +45,7 @@ end
 --- @param float_bufnr integer
 --- @param active_bufnr integer
 --- @param winr integer
-Render.draw = function(float_bufnr, active_bufnr, winr)
+H.draw = function(float_bufnr, active_bufnr, winr)
     local ns = vim.api.nvim_create_namespace("hacked.buffers")
     -- clear the buffer
     vim.api.nvim_buf_set_lines(float_bufnr, 0, -1, false, {})
@@ -45,7 +57,7 @@ Render.draw = function(float_bufnr, active_bufnr, winr)
         local _bufnr = buffers[cursor].bufnr
         vim.api.nvim_set_current_win(winr)
         vim.api.nvim_set_current_buf(_bufnr)
-        Render.draw(float_bufnr, _bufnr, winr)
+        H.draw(float_bufnr, _bufnr, winr)
     end, { buffer = float_bufnr })
     vim.keymap.set("n", "dd", function()
         local cursor = vim.fn.getpos(".")[2]
@@ -53,7 +65,7 @@ Render.draw = function(float_bufnr, active_bufnr, winr)
         if vim.api.nvim_buf_is_loaded(_bufnr) then
             vim.api.nvim_buf_delete(_bufnr, { force = true })
         end
-        Render.draw(float_bufnr, active_bufnr, winr)
+        H.draw(float_bufnr, active_bufnr, winr)
     end, { buffer = float_bufnr })
 
     vim.keymap.set("n", "q", function()
@@ -73,23 +85,24 @@ Render.draw = function(float_bufnr, active_bufnr, winr)
 
     for i, _buffer in ipairs(buffers) do
         local active = _buffer.bufnr == active_bufnr
-        local modified = vim.bo[_buffer.bufnr].modified and " " or ""
+        local modified = vim.bo[_buffer.bufnr].modified and opts.icons.modified or ""
         local bufnr_s = tostring(_buffer.bufnr)
-        local symbol = active and "  " or "  "
+        local symbol = active and opts.icons.active or opts.icons.inactive
         vim.api.nvim_buf_set_lines(float_bufnr, i - 1, i, false, {
             " "
                 .. symbol
                 .. string.rep(" ", (offset - #bufnr_s) or 0)
+                .. " "
                 .. bufnr_s
                 .. " "
                 .. _buffer.name
                 .. " "
-                .. modified
+                .. modified,
         })
         vim.api.nvim_buf_set_extmark(float_bufnr, ns, i - 1, 1, {
             virt_text = {
                 {
-                    symbol .. string.rep(" ", (offset - #bufnr_s) or 0) .. bufnr_s,
+                    symbol .. string.rep(" ", (offset - #bufnr_s) or 0) .. " " ..  bufnr_s,
                     active and "Boolean" or "Comment",
                 },
                 { " " .. _buffer.name, "String" },
@@ -123,18 +136,25 @@ M.open = function()
         style = "minimal",
     })
 
-    Render.draw(float_bufnr, bufnr, winr)
+    H.draw(float_bufnr, bufnr, winr)
     vim.api.nvim_create_autocmd({ "BufEnter", "BufModifiedSet" }, {
         group = vim.api.nvim_create_augroup("hacked.buffers", { clear = true }),
         callback = function(ev)
             if vim.api.nvim_win_is_valid(float_winr) and vim.api.nvim_buf_is_valid(float_bufnr) then
-                Render.draw(float_bufnr, ev.buf, winr)
+                H.draw(float_bufnr, ev.buf, winr)
             end
         end,
     })
 end
 
-M.setup = function()
+--- @param options ?hacked.buffers.Options
+M.setup = function(options)
+    options = options or {}
+    if options.icons then
+        opts.icons.active = options.icons.active or opts.icons.active
+        opts.icons.inactive = options.icons.inactive or opts.icons.inactive
+        opts.icons.modified = options.icons.modified or opts.icons.modified
+    end
     vim.api.nvim_create_user_command("HackedBufferList", function()
         M.open()
     end, {})
