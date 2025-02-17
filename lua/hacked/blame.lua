@@ -162,38 +162,42 @@ M.selection = function()
     local ns = vim.api.nvim_create_namespace("hacked.blame.selection")
     vim.api.nvim_buf_clear_namespace(bufnr, ns, sel_start - 1, sel_end)
     local line = 1
-    for _, blame_group in ipairs(blame_groups) do
-        for i, blame in ipairs(blame_group) do
-            if i == 1 then
+    for i, blame_group in ipairs(blame_groups) do
+        local hl = (i % 2) > 0 and "TodoFgTODO" or "TodoFgHACK"
+        for j, blame in ipairs(blame_group) do
+            if j == 1 then
                 vim.api.nvim_buf_set_extmark(bufnr, ns, sel_start - 2 + line, 0, {
                     -- TODO: enhance this to have more colorful blame lines...?
                     -- that way we know what belong with what
                     virt_text = {
-                        { " ", "TodoFgTODO" },
-                        { blame.author .. " ", "TodoFgTODO" },
+                        { " ", hl },
+                        { blame.author .. " ", hl },
                         { blame.date .. " " .. blame.time .. " ", "Comment" },
-                        { blame.commit, "TodoFgTODO" },
+                        { blame.commit, hl },
                     },
                     virt_text_pos = "right_align",
-                    line_hl_group = "Comment" -- this would alternate to enable easier differentiation
+                    line_hl_group = hl, -- this would alternate to enable easier differentiation
                 })
             else
                 vim.api.nvim_buf_set_extmark(bufnr, ns, sel_start - 2 + line, 0, {
                     virt_text = {
-                        { "│", "TodoFgTODO" },
+                        { "│", hl },
                     },
                     virt_text_pos = "right_align",
-                    line_hl_group = "Comment"
+                    line_hl_group = hl,
                 })
             end
             line = line + 1
         end
     end
 
-    -- TODO: move this to uv otherwise I can't reset the timer
-    vim.defer_fn(function()
-        vim.api.nvim_buf_clear_namespace(bufnr, ns, sel_start - 1, sel_end)
-    end, 15 * 1000)
+    vim.api.nvim_create_autocmd({ "CursorMoved", "CursorMovedI" }, {
+        buffer = bufnr,
+        once = true,
+        callback = function()
+            vim.api.nvim_buf_clear_namespace(bufnr, ns, sel_start - 1, sel_end)
+        end,
+    })
 end
 
 M.browse = function()
