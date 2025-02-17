@@ -94,6 +94,7 @@ M.line = function()
     end, { buffer = blame_bufnr, desc = "git blame: browse commit" })
 
     vim.api.nvim_create_autocmd("CursorMoved", {
+        group = vim.api.nvim_create_augroup("hacked.blame.line", { clear = true }),
         buffer = vim.api.nvim_get_current_buf(),
         callback = function()
             if vim.api.nvim_buf_is_valid(blame_bufnr) then
@@ -167,8 +168,6 @@ M.selection = function()
         for j, blame in ipairs(blame_group) do
             if j == 1 then
                 vim.api.nvim_buf_set_extmark(bufnr, ns, sel_start - 2 + line, 0, {
-                    -- TODO: enhance this to have more colorful blame lines...?
-                    -- that way we know what belong with what
                     virt_text = {
                         { " ", hl },
                         { blame.author .. " ", hl },
@@ -176,7 +175,7 @@ M.selection = function()
                         { blame.commit, hl },
                     },
                     virt_text_pos = "right_align",
-                    line_hl_group = hl, -- this would alternate to enable easier differentiation
+                    line_hl_group = hl,
                 })
             else
                 vim.api.nvim_buf_set_extmark(bufnr, ns, sel_start - 2 + line, 0, {
@@ -192,6 +191,7 @@ M.selection = function()
     end
 
     vim.api.nvim_create_autocmd({ "CursorMoved", "CursorMovedI" }, {
+        group = vim.api.nvim_create_augroup("hacked.blame.selection", { clear = true }),
         buffer = bufnr,
         once = true,
         callback = function()
