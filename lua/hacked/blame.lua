@@ -164,7 +164,7 @@ M.selection = function()
     vim.api.nvim_buf_clear_namespace(bufnr, ns, sel_start - 1, sel_end)
     local line = 1
     for i, blame_group in ipairs(blame_groups) do
-        local hl = (i % 2) > 0 and "TodoFgTODO" or "TodoFgHACK"
+        local hl = (i % 2) > 0 and "DiffAdd" or "DiffDelete"
         for j, blame in ipairs(blame_group) do
             if j == 1 then
                 vim.api.nvim_buf_set_extmark(bufnr, ns, sel_start - 2 + line, 0, {
