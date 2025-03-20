@@ -18,10 +18,12 @@ end
 local MAX_DIAGNOSTIC_MSG_LENGTH = 40
 local DEFAULT_SPACES = 5
 
+--- @param bufnr integer
+--- @param cursor_line integer
 --- @param diagnostic vim.Diagnostic
 --- @param spaces integer
 --- @return table
-local format_diagnostic = function(diagnostic, spaces)
+local format_diagnostic = function(bufnr, cursor_line, diagnostic, spaces)
     local diagnostic_split = vim.split(diagnostic.message, "\n")
     --- @type string[]
     local lines_limited = {}
@@ -47,15 +49,29 @@ local format_diagnostic = function(diagnostic, spaces)
         end
     end
 
+    local longest_line =
+        tbl.max(vim.iter(vim.api.nvim_buf_get_lines(bufnr, cursor_line, cursor_line + #lines_limited, false))
+            :map(function(v)
+                return #v
+            end)
+            :totable())
+
+    local offsets = vim.iter(vim.api.nvim_buf_get_lines(bufnr, cursor_line, cursor_line + #lines_limited, false))
+        :map(function(v)
+            return longest_line - #v
+        end)
+        :totable()
+
     local lines = {}
     for i, message in ipairs(lines_limited) do
         local symbol
+        local offset = offsets[i] or 0
         if i == 1 then
-            symbol = " "
+            symbol = "󰊠 "
         else
             symbol = "│"
         end
-        local msg = string.format("%s%s %s", string.rep(" ", spaces), symbol, message)
+        local msg = string.format("%s%s %s", string.rep(" ", spaces + offset), symbol, message)
         table.insert(lines, { { msg, "Diagnostic" .. severity_to_string(diagnostic.severity) } })
     end
 
@@ -71,29 +87,15 @@ local show_virtual_text_diagnostics = function()
     if #diagnostics == 0 then
         return
     end
-    local longest_line =
-        tbl.max(vim.iter(vim.api.nvim_buf_get_lines(bufnr, cursor_line, cursor_line + #diagnostics, false))
-            :map(function(v)
-                return #v
-            end)
-            :totable())
-
-    local spaces = vim.iter(vim.api.nvim_buf_get_lines(bufnr, cursor_line, cursor_line + #diagnostics, false))
-        :map(function(v)
-            return longest_line - #v
-        end)
-        :totable()
 
     local virt_lines = {}
-    for i, diagnostic in ipairs(diagnostics) do
-        local space = spaces[i] or 0
-        local lines = format_diagnostic(diagnostic, space + DEFAULT_SPACES)
-        for _, line in ipairs(lines) do
-            table.insert(virt_lines, line)
-        end
+    -- TODO: will add multiple later...
+    -- for _, diagnostic in ipairs(diagnostics) do
+    -- end
+    local lines = format_diagnostic(bufnr, cursor_line, diagnostics[1], DEFAULT_SPACES)
+    for _, line in ipairs(lines) do
+        table.insert(virt_lines, line)
     end
-
-    vim.print(virt_lines)
 
     for i, vline in ipairs(virt_lines) do
         vim.api.nvim_buf_set_extmark(bufnr, ns, cursor_line + i - 1, 0, {
