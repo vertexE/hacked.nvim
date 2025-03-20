@@ -15,7 +15,7 @@ local severity_to_string = function(severity)
     return options[severity]
 end
 
-local MAX_DIAGNOSTIC_MSG_LENGTH = 80
+local MAX_DIAGNOSTIC_MSG_LENGTH = 40
 local DEFAULT_SPACES = 5
 
 --- @param diagnostic vim.Diagnostic
