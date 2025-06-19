@@ -89,11 +89,18 @@ local parse_git_status = function(s)
         local status = string.sub(line, 1, 2)
         local fp = string.sub(line, 3)
         fp = vim.trim(fp)
+
+        -- handle rename case
+        local _, last = fp:find(" -> ")
+        if last ~= nil then
+            fp = vim.trim(fp:sub(last))
+        end
+
         local segments = vim.split(fp, "/")
         local file = segments[#segments]
         local stage_mark = string.sub(status, 1, 1)
         local unstaged = #vim.trim(string.sub(status, 2, 2)) > 0
-        local staged = stage_mark ~= " " and stage_mark ~= "?"
+        local staged = stage_mark ~= " " and stage_mark ~= "?" and stage_mark ~= "U"
         status = string.sub(vim.trim(status), 1, 1)
         local change = {
             file = file,
@@ -131,12 +138,13 @@ end
 --- @param change hacked.git.Change
 local draw_file = function(bufnr, ns, line, change)
     vim.api.nvim_buf_set_lines(bufnr, -1, -1, false, { " " })
-    local hl = (change.type == "conflict" or change.type == "deleted") and "MiniIconsRed"
+    local hl = ((change.type == "conflict" and change.stage ~= "staged") or change.type == "deleted") and "MiniIconsRed"
         or (
             change.stage == "partial" and "MiniIconsYellow"
             or (change.stage == "staged" and "MiniIconsGreen" or "MiniIconsGrey")
         )
-    local symbol = change.type == "conflict" and " " or (change.stage == "staged" and " " or " ")
+    local symbol = (change.type == "conflict" and change.stage ~= "staged") and " "
+        or (change.stage == "staged" and " " or " ")
     vim.api.nvim_buf_set_extmark(bufnr, ns, line, 0, {
         virt_text = { { string.rep(" ", change.depth), "Comment" }, { symbol .. change.file, hl } },
         virt_text_pos = "eol",
@@ -232,7 +240,15 @@ H.git_toggle = function(bufnr, line, change)
             if #out.stderr > 0 then
                 vim.notify("failed to add file", vim.log.levels.ERROR, {})
             else
-                change.stage = change.stage == "staged" and "working" or "staged"
+                if change.stage == "staged" and change.type == "conflict" then
+                    change.stage = "working"
+                    change.type = "modified"
+                elseif change.stage == "staged" then
+                    change.stage = "working"
+                else
+                    change.stage = "staged"
+                end
+
                 local ns = vim.api.nvim_create_namespace("hacked.git.status")
                 vim.api.nvim_buf_clear_namespace(bufnr, ns, line - 1, line)
                 draw_file(bufnr, ns, line - 1, change)
@@ -331,6 +347,9 @@ H.git_status = function(bufnr, pwinr, winr, buf_name)
                         vim.api.nvim_win_close(winr, true)
                     end
                 end, { buffer = bufnr })
+            else
+                -- if there's no diff we close the window?
+                vim.notify("No changes found", vim.log.levels.INFO, {})
             end
         end)
     )
