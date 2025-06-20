@@ -1,6 +1,24 @@
 local M = {}
 local H = {}
 
+--- @class hacked.git.Context
+--- @field prev_winr integer the previous win before opening git status
+
+--- @class hacked.git.Config
+--- @field actions ?table<string,fun(change:hacked.git.Change, ctx:hacked.git.Context):hacked.git.Change> apply an action on a change mapped by keys
+
+--- @type hacked.git.Config
+local config = {
+    actions = {},
+}
+
+---@param opts ?hacked.git.Config
+M.setup = function(opts)
+    if opts ~= nil then
+        config.actions = opts.actions or config.actions
+    end
+end
+
 local confirm = require("hacked.confirm")
 
 --- @alias hacked.git.ChangeType "modified"|"renamed"|"added"|"deleted"|"conflict"
@@ -8,6 +26,7 @@ local confirm = require("hacked.confirm")
 
 --- @class hacked.git.State
 --- @field lines_to_path table<integer,hacked.git.Change> line number in status buf mapping to file path
+--- @field winr integer which window the status UI is open in
 
 --- @class hacked.git.Change
 --- @field file string
@@ -26,6 +45,7 @@ local confirm = require("hacked.confirm")
 --- @type hacked.git.State
 local state = {
     lines_to_path = {},
+    winr = -1,
 }
 
 --- @param node hacked.git.Dir
@@ -342,6 +362,17 @@ H.git_status = function(bufnr, pwinr, winr, buf_name)
                     end
                 end, { buffer = bufnr })
 
+                --- allows for any number of custom actions
+                for key, action in pairs(config.actions) do
+                    vim.keymap.set("n", key, function()
+                        local clnr = vim.fn.getpos(".")[2]
+                        local change = state.lines_to_path[clnr]
+                        if change then
+                            change = action(change, { prev_winr = pwinr })
+                        end
+                    end, { buffer = bufnr })
+                end
+
                 vim.keymap.set("n", "q", function()
                     if vim.api.nvim_win_is_valid(winr) then
                         vim.api.nvim_win_close(winr, true)
@@ -356,19 +387,26 @@ H.git_status = function(bufnr, pwinr, winr, buf_name)
 end
 
 M.status = function()
-    local winr = vim.api.nvim_get_current_win()
+    if vim.api.nvim_win_is_valid(state.winr) then
+        vim.api.nvim_set_current_win(state.winr)
+        return
+    end
+
+    local pwinr = vim.api.nvim_get_current_win()
     local relative = vim.fn.fnamemodify(vim.api.nvim_buf_get_name(0), ":~:.")
     local editor_width = vim.o.columns
     local width = math.ceil(editor_width * 0.25)
 
     local float_buf = vim.api.nvim_create_buf(false, true)
-    local l_winr = vim.api.nvim_open_win(float_buf, true, {
-        win = winr,
+    local status_winr = vim.api.nvim_open_win(float_buf, true, {
+        win = pwinr,
         width = width,
         split = "left",
         style = "minimal",
     })
-    H.git_status(float_buf, winr, l_winr, relative)
+
+    state.winr = status_winr
+    H.git_status(float_buf, pwinr, status_winr, relative)
 end
 
 return M
