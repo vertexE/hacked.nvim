@@ -404,6 +404,7 @@ M.status = function()
         split = "left",
         style = "minimal",
     })
+    vim.wo[status_winr].winfixwidth = true
 
     state.winr = status_winr
     H.git_status(float_buf, pwinr, status_winr, relative)
