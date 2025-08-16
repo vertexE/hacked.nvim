@@ -2,7 +2,7 @@ local M = {}
 
 local tbl = require("hacked._private.tbl")
 local buffer = require("hacked._private.buffer")
-local str = require("hacked._private.str")
+-- local str = require("hacked._private.str")
 
 --- @class hacked.blame.Config
 
@@ -53,15 +53,26 @@ end
 
 --- get the git blame for a line
 local blame_win = -1
+local blame_bufnr = -1
 
 M.line = function()
     if vim.api.nvim_win_is_valid(blame_win) then
         vim.api.nvim_set_current_win(blame_win)
+        vim.api.nvim_create_autocmd("WinLeave", {
+            group = vim.api.nvim_create_augroup("hacked.blame.line", { clear = true }),
+            once = true,
+            callback = function()
+                if vim.api.nvim_buf_is_valid(blame_bufnr) then
+                    vim.api.nvim_buf_delete(blame_bufnr, { force = true })
+                end
+            end,
+        })
+        return
     end
 
     local rel_path = vim.fn.expand("%:.")
     local cur_pos = vim.fn.getpos(".")[2]
-    local blame_bufnr = vim.api.nvim_create_buf(false, true)
+    blame_bufnr = vim.api.nvim_create_buf(false, true)
     local cmd = vim.system({ "git", "blame", rel_path, string.format("-L %d,%d", cur_pos, cur_pos) }, { text = true })
         :wait()
     local blame
@@ -88,6 +99,7 @@ M.line = function()
         height = 3,
         width = 55,
     })
+    vim.wo[blame_win].number = false
 
     vim.keymap.set("n", "<enter>", function()
         vim.system({ "gh", "browse", blame.commit }):wait()
@@ -95,7 +107,7 @@ M.line = function()
 
     vim.api.nvim_create_autocmd("CursorMoved", {
         group = vim.api.nvim_create_augroup("hacked.blame.line", { clear = true }),
-        buffer = vim.api.nvim_get_current_buf(),
+        once = true,
         callback = function()
             if vim.api.nvim_buf_is_valid(blame_bufnr) then
                 vim.api.nvim_buf_delete(blame_bufnr, { force = true })
