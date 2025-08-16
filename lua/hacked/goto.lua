@@ -73,6 +73,14 @@ M.menu = function()
 
     vim.cmd("edit " .. filepath())
 
+    vim.api.nvim_create_autocmd({ "BufWritePost" }, {
+        buffer = float_buf,
+        group = vim.api.nvim_create_augroup("hacked.goto.notif", { clear = true }),
+        callback = function()
+            vim.notify("saved!")
+        end,
+    })
+
     vim.keymap.set("n", "<enter>", function()
         local line = vim.api.nvim_get_current_line()
         local file = parse_line(line)
