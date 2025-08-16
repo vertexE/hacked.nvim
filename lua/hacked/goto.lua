@@ -1,0 +1,99 @@
+local M = {}
+local H = {}
+
+local fs = require("hacked._private.files")
+
+local LOCATION = "~/.cache/nvim/hacked-goto"
+local FILE = "_gotos.txt"
+
+--- @class hacked.goto.File
+--- @field path string
+--- @field cl integer cursor line
+
+--- @return string
+local filepath = function()
+    return vim.fn.expand(LOCATION .. "/" .. vim.fn.fnamemodify("", ":p:h"):gsub("/", "_") .. FILE)
+end
+
+--- @param line string
+--- @return hacked.goto.File|nil
+local parse_line = function(line)
+    local path, cl = string.match(line, "^(.-):(%d+)$")
+    if path and cl then
+        return { path = path, cl = cl }
+    end
+end
+
+--- add the current buffer to the file list
+M.add = function()
+    local bufnr = vim.api.nvim_get_current_buf()
+    if vim.api.nvim_get_option_value("buftype", { buf = bufnr }) ~= "" then
+        vim.notify("cannot add invalid buffer", vim.log.levels.WARN, {})
+        return
+    end
+    local name = vim.api.nvim_buf_get_name(bufnr)
+    local file = vim.fn.fnamemodify(name, ":p:.")
+    local cl = vim.fn.getpos(".")[2]
+    fs.append_line(filepath(), string.format("%s:%d", file, cl))
+end
+
+--- goto the provided index and open in the corresponding window
+--- @param file hacked.goto.File|nil
+--- @param winr integer
+H.open = function(file, winr)
+    if file == nil then
+        return
+    end
+    vim.api.nvim_set_current_win(winr)
+    vim.cmd("edit " .. file.path)
+    vim.cmd(string.format("normal! %dggzz", file.cl))
+end
+
+--- open an editable float
+M.menu = function()
+    local winr = vim.api.nvim_get_current_win()
+    local editor_width = vim.o.columns
+    local editor_height = vim.o.lines
+    local width = math.floor(0.5 * editor_width)
+    local height = math.floor(0.32 * editor_height)
+    local row = (editor_height - height) / 2
+    local col = (editor_width - width) / 2
+
+    local float_buf = vim.api.nvim_create_buf(false, true)
+    vim.api.nvim_open_win(float_buf, true, {
+        title = vim.fn.fnamemodify("", ":p:h"),
+        relative = "editor",
+        row = row,
+        col = col,
+        width = width,
+        height = height,
+        style = "minimal",
+        border = "rounded",
+    })
+
+    vim.cmd("edit " .. filepath())
+
+    vim.keymap.set("n", "<enter>", function()
+        local line = vim.api.nvim_get_current_line()
+        local file = parse_line(line)
+        H.open(file, winr)
+        if vim.api.nvim_buf_is_valid(float_buf) then
+            vim.api.nvim_buf_delete(float_buf, { force = true })
+        end
+    end, { buffer = float_buf })
+
+    vim.keymap.set("n", "q", function()
+        if vim.api.nvim_buf_is_valid(float_buf) then
+            vim.api.nvim_buf_delete(float_buf, { force = true })
+        end
+    end, { buffer = float_buf })
+end
+
+M.setup = function()
+    local dir = vim.fn.expand(LOCATION)
+    if vim.fn.isdirectory(dir) == 0 then
+        vim.fn.mkdir(dir, "p")
+    end
+end
+
+return M
