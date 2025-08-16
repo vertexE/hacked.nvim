@@ -32,9 +32,9 @@ M.add = function()
         return
     end
     local name = vim.api.nvim_buf_get_name(bufnr)
-    local file = vim.fn.fnamemodify(name, ":p:.")
+    local fpath = vim.fn.fnamemodify(name, ":p:.")
     local cl = vim.fn.getpos(".")[2]
-    fs.append_line(filepath(), string.format("%s:%d", file, cl))
+    fs.append_line(filepath(), string.format("%s:%d", fpath, cl))
 end
 
 --- goto the provided index and open in the corresponding window
@@ -45,8 +45,36 @@ H.open = function(file, winr)
         return
     end
     vim.api.nvim_set_current_win(winr)
-    vim.cmd("edit " .. file.path)
+
+    local bufs = vim.api.nvim_list_bufs()
+    local bufnr = vim.iter(bufs):find(function(buf)
+        local name = vim.api.nvim_buf_get_name(buf)
+        local fpath = vim.fn.fnamemodify(name, ":p:.")
+        return fpath == file.path
+    end)
+
+    if bufnr ~= nil then
+        vim.api.nvim_win_set_buf(winr, bufnr)
+    else
+        vim.cmd("edit " .. file.path)
+    end
     vim.cmd(string.format("normal! %dggzz", file.cl))
+end
+
+--- quickly open a specific saved goto
+--- @param i integer 1 based index
+M.quick_open = function(i)
+    local content, _ = fs.read(filepath())
+    if content ~= nil then
+        local lines = vim.split(content, "\n")
+        local line = lines[i]
+        if line ~= nil then
+            local file = parse_line(line)
+            H.open(file, 0)
+        else
+            vim.notify("invalid position", vim.log.levels.WARN, {})
+        end
+    end
 end
 
 --- open an editable float
