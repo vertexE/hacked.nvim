@@ -97,7 +97,7 @@ M.line = function()
         row = 0,
         col = 2,
         height = 3,
-        width = 55,
+        width = 40,
     })
     vim.wo[blame_win].number = false
 
@@ -183,7 +183,7 @@ M.selection = function()
                     virt_text = {
                         { " ", hl },
                         { blame.author .. " ", hl },
-                        { blame.date .. " " .. blame.time .. " ", "Comment" },
+                        { blame.date .. " " .. blame.time .. " ", hl },
                         { blame.commit, hl },
                     },
                     virt_text_pos = "right_align",
