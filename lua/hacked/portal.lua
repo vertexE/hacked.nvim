@@ -167,11 +167,11 @@ end
 
 --- loadup persisted code blocks
 M.setup = function()
-    vim.schedule(load)
     local dir = vim.fn.expand(CACHE)
     if vim.fn.isdirectory(dir) == 0 then
         vim.fn.mkdir(dir, "p")
     end
+    vim.schedule(load)
 end
 
 return M

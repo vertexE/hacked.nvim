@@ -1,6 +1,10 @@
 local M = {}
 local H = {}
 
+-- TODO: when opening menu, cursor should appear on current file (if I'm in that file) / the last accessed file
+-- TODO: extmark text over buffer to display file name, symbol, if it's edited, Comment hl on full path, file size, etc.
+--       ^the above would also require an autocommand for when we switch modes to know when to show/hide tasks
+
 local fs = require("hacked._private.files")
 
 local LOCATION = "~/.cache/nvim/hacked-goto"
@@ -24,6 +28,10 @@ local parse_line = function(line)
     end
 end
 
+local state = {
+    should_refresh_cached_goto_list = true,
+}
+
 --- add the current buffer to the file list
 M.add = function()
     local bufnr = vim.api.nvim_get_current_buf()
@@ -35,6 +43,7 @@ M.add = function()
     local fpath = vim.fn.fnamemodify(name, ":p:.")
     local cl = vim.fn.getpos(".")[2]
     fs.append_line(filepath(), string.format("%s:%d", fpath, cl))
+    state.should_refresh_cached_goto_list = true
 end
 
 --- goto the provided index and open in the corresponding window
@@ -59,14 +68,20 @@ H.open = function(file, winr)
         vim.cmd("edit " .. file.path)
     end
     vim.cmd(string.format("normal! %dggzz", file.cl))
+    state.should_refresh_cached_goto_list = false
 end
+
+--- @type string|nil
+local cached_gotos = ""
 
 --- quickly open a specific saved goto
 --- @param i integer 1 based index
 M.quick_open = function(i)
-    local content, _ = fs.read(filepath())
-    if content ~= nil then
-        local lines = vim.split(content, "\n")
+    if state.should_refresh_cached_goto_list then
+        cached_gotos, _ = fs.read(filepath())
+    end
+    if cached_gotos ~= nil then
+        local lines = vim.split(cached_gotos, "\n")
         local line = lines[i]
         if line ~= nil then
             local file = parse_line(line)
@@ -130,6 +145,13 @@ M.setup = function()
     if vim.fn.isdirectory(dir) == 0 then
         vim.fn.mkdir(dir, "p")
     end
+
+    vim.api.nvim_create_autocmd({ "DirChanged" }, {
+        group = vim.api.nvim_create_augroup("hacked.goto.dir", { clear = true }),
+        callback = function()
+            state.should_refresh_cached_goto_list = true
+        end,
+    })
 end
 
 return M
